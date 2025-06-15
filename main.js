@@ -1,97 +1,93 @@
 // main.js
 
-let p5tCube = null; // 接続されたToioキューブのインスタンス
-let currentQuestionIndex = 0;
-let quizQuestions = [
-    {
-        question: "日本の首都はどこ？",
-        choices: {
-            topLeft: "大阪",
-            topRight: "東京",
-            bottomLeft: "福岡",
-            bottomRight: "札幌"
-        },
-        correctDirection: "topRight" // 正解の方向
-    },
-    {
-        question: "世界で一番高い山は？",
-        choices: {
-            topLeft: "K2",
-            topRight: "マッターホルン",
-            bottomLeft: "モンブラン",
-            bottomRight: "エベレスト"
-        },
-        correctDirection: "bottomRight"
-    },
-    {
-        question: "太陽系の惑星で一番大きいのは？",
-        choices: {
-            topLeft: "地球",
-            topRight: "木星",
-            bottomLeft: "火星",
-            bottomRight: "土星"
-        },
-        correctDirection: "topRight"
+// Toioのモーションセンサーデータ購読を開始する関数
+function startToioMotionSensor() {
+    if (p5tCube) {
+        // --- ★ここを修正します★ ---
+        // p5.toio のセンサーデータは、P5tCubeインスタンスのプロパティとして直接アクセスするか、
+        // あるいは `addEventListener` を使用します。
+        // ここでは、p5.jsの draw() ループを利用して定期的にデータを参照する形に修正します。
+
+        // p5.js の setup 関数内でループ処理を開始しているはずなので、
+        // draw() 関数内で p5tCube.roll や p5tCube.pitch を参照するのが一般的な使い方です。
+
+        // 一旦、p5.js の draw ループと連携させる形にします。
+
+        // p5.js の setup() 関数内で toio を初期化し、
+        // draw() 関数内で toio のセンサーデータを参照するように変更します。
+
+        // 新しいToio接続時に、センサーデータのポーリングを開始するためのフラグを設定
+        g_isToioConnected = true;
+
+        console.log("Toioのモーションセンサーデータの監視を開始しました。");
     }
-];
+}
 
-// UI要素の取得
-const connectButton = document.getElementById('connectButton');
-const statusText = document.getElementById('status');
-const quizArea = document.getElementById('quizArea');
-const questionText = document.getElementById('question');
-const choiceTopLeft = document.getElementById('choice-topLeft');
-const choiceTopRight = document.getElementById('choice-topRight');
-const choiceBottomLeft = document.getElementById('choice-bottomLeft');
-const choiceBottomRight = document.getElementById('choice-bottomRight');
-const resultText = document.getElementById('result');
-const debugRoll = document.getElementById('debugRoll');
-const debugPitch = document.getElementById('debugPitch');
-const debugSelectedDirection = document.getElementById('debugSelectedDirection');
 
-// 選択中の選択肢を保持する変数
-let selectedDirection = null;
-let selectionTimer = null; // 選択確定用のタイマー
-const SELECTION_CONFIRM_TIME = 1000; // 選択確定までの時間 (ms)
-let isProcessingSelection = false; // 選択処理中フラグ
-
-// 傾き判定の閾値
-const TILT_THRESHOLD = 20; // デグリー単位。この値を超えて傾いたと判断する閾値。
-
-// --- p5.js と p5.toio の設定 ---
+// --- 新たに追加・修正する部分 ---
 
 // p5.js のセットアップ関数 (初回一度だけ実行される)
+// この関数内で Toio 接続処理は行わず、UIの初期化だけを行う
 function setup() {
-    // createCanvas はHTMLキャンバスを生成しますが、今回は表示用ではないので最小サイズに
-    createCanvas(1, 1).parent(document.body); // <body>の子要素として作成
-    noCanvas(); // キャンバスは非表示に
+    createCanvas(1, 1).parent(document.body);
+    noCanvas();
+    // ここではToio接続は行わない。ボタンクリック時に接続する
 }
 
-// p5.js のドロー関数 (毎フレーム実行されるが、今回は使わない)
+// グローバル変数として、Toioが接続されたかどうかのフラグと、現在の傾きデータを保持
+let g_isToioConnected = false;
+let g_currentRoll = 0;
+let g_currentPitch = 0;
+
+
+// p5.js のドロー関数 (毎フレーム実行される)
+// ここでToioのセンサーデータをポーリングします
 function draw() {
-    // 描画処理は行わない
+    if (g_isToioConnected && p5tCube && p5tCube.isConnected()) {
+        // p5tCube の sensor オブジェクトから直接 roll と pitch を取得
+        // (p5.toio のバージョンによってパスが異なる可能性があるので、コンソールログで確認推奨)
+        // 例えば、p5tCube.motion.roll のような形かもしれません。
+        // 公式ドキュメントの記載例では `cube.roll` `cube.pitch` のように直接プロパティアクセスも可能なようです
+        const roll = p5tCube.roll;
+        const pitch = p5tCube.pitch;
+
+        // デバッグ表示の更新
+        debugRoll.innerText = roll ? roll.toFixed(2) : "N/A";
+        debugPitch.innerText = pitch ? pitch.toFixed(2) : "N/A";
+
+        // 傾き判定ロジックを呼び出す
+        handleToioTilt(roll, pitch);
+
+        // 前回と値が変わった時だけ更新したい場合は、ここで古い値と現在の値を比較する
+        // g_currentRoll = roll;
+        // g_currentPitch = pitch;
+    }
 }
 
-// Toio接続ボタンのイベントリスナー
+// handleToioTilt 関数はそのまま利用
+
+// connectButton.addEventListener の中も一部変更
 connectButton.addEventListener('click', async () => {
     try {
         statusText.innerText = 'Toioに接続中...';
-        // P5tCube.connectNewP5tCube() でToioに接続
         p5tCube = await P5tCube.connectNewP5tCube();
         statusText.innerText = 'Toioに接続しました！';
-        connectButton.style.display = 'none'; // 接続ボタンを非表示に
+        connectButton.style.display = 'none';
 
-        // Toioのモーションセンサーイベントを購読
-        startToioMotionSensor();
+        // 接続成功したら、p5.js の draw ループ内でセンサーデータを監視するフラグを立てる
+        g_isToioConnected = true; // このフラグを立てることで draw 関数内でセンサー監視が開始されます
 
         // 最初のクイズを表示
         displayQuestion(currentQuestionIndex);
-        quizArea.style.display = 'block'; // クイズエリアを表示
+        quizArea.style.display = 'block';
     } catch (error) {
         console.error('Toio接続エラー:', error);
         statusText.innerText = `接続エラー: ${error.message}`;
     }
 });
+
+
+// ... 以下のクイズロジックは変更なし ...
 
 // Toioのモーションセンサーデータ購読を開始する関数
 function startToioMotionSensor() {
