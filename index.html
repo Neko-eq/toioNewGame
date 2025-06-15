@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Toio 傾き選択クイズ</title>
+    <title>Toio 傾き選択クイズ (p5.toio版)</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
@@ -14,6 +14,8 @@
             min-height: 100vh;
             background-color: #f0f0f0;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box; /* パディングを含めてサイズを計算 */
         }
         #container {
             background-color: white;
@@ -132,6 +134,8 @@
         </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
+    <script src="https://tetunori.github.io/p5.toio/dist/0.8.0/p5.toio.min.js"></script>
+    <script src="main.js"></script>
 </body>
 </html>
