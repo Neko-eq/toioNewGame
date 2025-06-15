@@ -1,119 +1,122 @@
 // main.js
 
-// Toioのモーションセンサーデータ購読を開始する関数
-function startToioMotionSensor() {
-    if (p5tCube) {
-        // --- ★ここを修正します★ ---
-        // p5.toio のセンサーデータは、P5tCubeインスタンスのプロパティとして直接アクセスするか、
-        // あるいは `addEventListener` を使用します。
-        // ここでは、p5.jsの draw() ループを利用して定期的にデータを参照する形に修正します。
-
-        // p5.js の setup 関数内でループ処理を開始しているはずなので、
-        // draw() 関数内で p5tCube.roll や p5tCube.pitch を参照するのが一般的な使い方です。
-
-        // 一旦、p5.js の draw ループと連携させる形にします。
-
-        // p5.js の setup() 関数内で toio を初期化し、
-        // draw() 関数内で toio のセンサーデータを参照するように変更します。
-
-        // 新しいToio接続時に、センサーデータのポーリングを開始するためのフラグを設定
-        g_isToioConnected = true;
-
-        console.log("Toioのモーションセンサーデータの監視を開始しました。");
+let p5tCube = null; // 接続されたToioキューブのインスタンス
+let currentQuestionIndex = 0;
+let quizQuestions = [
+    {
+        question: "日本の首都はどこ？",
+        choices: {
+            topLeft: "大阪",
+            topRight: "東京",
+            bottomLeft: "福岡",
+            bottomRight: "札幌"
+        },
+        correctDirection: "topRight" // 正解の方向
+    },
+    {
+        question: "世界で一番高い山は？",
+        choices: {
+            topLeft: "K2",
+            topRight: "マッターホルン",
+            bottomLeft: "モンブラン",
+            bottomRight: "エベレスト"
+        },
+        correctDirection: "bottomRight"
+    },
+    {
+        question: "太陽系の惑星で一番大きいのは？",
+        choices: {
+            topLeft: "地球",
+            topRight: "木星",
+            bottomLeft: "火星",
+            bottomRight: "土星"
+        },
+        correctDirection: "topRight"
     }
-}
+];
 
+// UI要素の取得
+const connectButton = document.getElementById('connectButton');
+const statusText = document.getElementById('status');
+const quizArea = document.getElementById('quizArea');
+const questionText = document.getElementById('question');
+const choiceTopLeft = document.getElementById('choice-topLeft');
+const choiceTopRight = document.getElementById('choice-topRight');
+const choiceBottomLeft = document.getElementById('choice-bottomLeft');
+const choiceBottomRight = document.getElementById('choice-bottomRight');
+const resultText = document.getElementById('result');
+const debugRoll = document.getElementById('debugRoll');
+const debugPitch = document.getElementById('debugPitch');
+const debugSelectedDirection = document.getElementById('debugSelectedDirection');
 
-// --- 新たに追加・修正する部分 ---
+// 選択中の選択肢を保持する変数
+let selectedDirection = null;
+let selectionTimer = null; // 選択確定用のタイマー
+const SELECTION_CONFIRM_TIME = 1000; // 選択確定までの時間 (ms)
+let isProcessingSelection = false; // 選択処理中フラグ
+
+// 傾き判定の閾値
+const TILT_THRESHOLD = 20; // デグリー単位。この値を超えて傾いたと判断する閾値。
+
+// --- p5.js と p5.toio の設定 ---
+
+// グローバル変数として、Toioが接続されたかどうかのフラグと、現在の傾きデータを保持
+let g_isToioConnected = false;
+// g_currentRoll, g_currentPitch は draw 関数内で直接 p5tCube.roll/pitch を参照するため不要になりました
 
 // p5.js のセットアップ関数 (初回一度だけ実行される)
-// この関数内で Toio 接続処理は行わず、UIの初期化だけを行う
 function setup() {
     createCanvas(1, 1).parent(document.body);
     noCanvas();
     // ここではToio接続は行わない。ボタンクリック時に接続する
 }
 
-// グローバル変数として、Toioが接続されたかどうかのフラグと、現在の傾きデータを保持
-let g_isToioConnected = false;
-let g_currentRoll = 0;
-let g_currentPitch = 0;
-
-
 // p5.js のドロー関数 (毎フレーム実行される)
 // ここでToioのセンサーデータをポーリングします
 function draw() {
     if (g_isToioConnected && p5tCube && p5tCube.isConnected()) {
         // p5tCube の sensor オブジェクトから直接 roll と pitch を取得
-        // (p5.toio のバージョンによってパスが異なる可能性があるので、コンソールログで確認推奨)
-        // 例えば、p5tCube.motion.roll のような形かもしれません。
-        // 公式ドキュメントの記載例では `cube.roll` `cube.pitch` のように直接プロパティアクセスも可能なようです
+        // p5.toio v0.8.0 では、P5tCubeインスタンスのプロパティとして直接アクセスできるようです
         const roll = p5tCube.roll;
         const pitch = p5tCube.pitch;
 
         // デバッグ表示の更新
-        debugRoll.innerText = roll ? roll.toFixed(2) : "N/A";
-        debugPitch.innerText = pitch ? pitch.toFixed(2) : "N/A";
+        debugRoll.innerText = roll !== undefined && roll !== null ? roll.toFixed(2) : "N/A";
+        debugPitch.innerText = pitch !== undefined && pitch !== null ? pitch.toFixed(2) : "N/A";
 
         // 傾き判定ロジックを呼び出す
         handleToioTilt(roll, pitch);
-
-        // 前回と値が変わった時だけ更新したい場合は、ここで古い値と現在の値を比較する
-        // g_currentRoll = roll;
-        // g_currentPitch = pitch;
     }
 }
 
-// handleToioTilt 関数はそのまま利用
-
-// connectButton.addEventListener の中も一部変更
+// Toio接続ボタンのイベントリスナー
 connectButton.addEventListener('click', async () => {
     try {
         statusText.innerText = 'Toioに接続中...';
+        // P5tCube.connectNewP5tCube() でToioに接続
         p5tCube = await P5tCube.connectNewP5tCube();
         statusText.innerText = 'Toioに接続しました！';
-        connectButton.style.display = 'none';
+        connectButton.style.display = 'none'; // 接続ボタンを非表示に
 
         // 接続成功したら、p5.js の draw ループ内でセンサーデータを監視するフラグを立てる
         g_isToioConnected = true; // このフラグを立てることで draw 関数内でセンサー監視が開始されます
 
         // 最初のクイズを表示
         displayQuestion(currentQuestionIndex);
-        quizArea.style.display = 'block';
+        quizArea.style.display = 'block'; // クイズエリアを表示
     } catch (error) {
         console.error('Toio接続エラー:', error);
         statusText.innerText = `接続エラー: ${error.message}`;
     }
 });
 
-
-// ... 以下のクイズロジックは変更なし ...
-
-// Toioのモーションセンサーデータ購読を開始する関数
-function startToioMotionSensor() {
-    if (p5tCube) {
-        // p5.toio では 'sensor:motion' イベントでモーションデータを取得
-        p5tCube.on("sensor:motion", (data) => {
-            // data オブジェクトに roll, pitch, yaw などが含まれるはずです
-            // p5.toioのバージョンやToioのファームウェアによってデータ形式が異なる可能性があるので
-            // ログで一度確認するのが安全です
-            // console.log("Motion Data:", data);
-
-            const roll = data.roll;
-            const pitch = data.pitch;
-
-            debugRoll.innerText = roll.toFixed(2);
-            debugPitch.innerText = pitch.toFixed(2);
-
-            // 傾き判定ロジックを呼び出す
-            handleToioTilt(roll, pitch);
-        });
-        // 必要に応じて、Toio側でモーションセンサーを有効にするコマンドを送る（p5.toioでは自動的に行われる場合が多い）
-    }
-}
-
 // 傾き判定ロジック
 function handleToioTilt(roll, pitch) {
+    // roll または pitch が undefined/null の場合は処理しない（初期データがまだ来ていない可能性）
+    if (roll === undefined || roll === null || pitch === undefined || pitch === null) {
+        return;
+    }
+
     if (isProcessingSelection) return; // 選択処理中は新たな傾きを無視
 
     let currentDetectedDirection = null;
@@ -132,7 +135,7 @@ function handleToioTilt(roll, pitch) {
     // 左に傾ける = roll が負の値に
 
     // どの方向に傾いているかを判定
-    if (pitch > TILS_THRESHOLD && roll < -TILT_THRESHOLD) { // 奥（上）に傾けつつ、左に傾ける
+    if (pitch > TILT_THRESHOLD && roll < -TILT_THRESHOLD) { // 奥（上）に傾けつつ、左に傾ける
         currentDetectedDirection = "topLeft";
     } else if (pitch > TILT_THRESHOLD && roll > TILT_THRESHOLD) { // 奥（上）に傾けつつ、右に傾ける
         currentDetectedDirection = "topRight";
@@ -182,10 +185,9 @@ function displayQuestion(index) {
     if (index >= quizQuestions.length) {
         questionText.innerText = "すべての問題が終了しました！";
         resultText.innerText = "お疲れ様でした！";
-        // Toioのモーションセンサーデータの購読を停止 (p5.toioでは明示的な停止APIがない場合がある)
-        // もし必要なら p5tCube.on("sensor:motion", null); のようにイベントリスナーを解除する
+        // ToioのLEDを消す
         if (p5tCube) {
-            p5tCube.turnOffLight(); // LEDを消す
+            p5tCube.turnOffLight();
         }
         return;
     }
