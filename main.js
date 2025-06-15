@@ -1,39 +1,44 @@
-console.log("main.js読み込み完了");
+let cube; // 接続されたtoioを保持
 
-document.getElementById("connect").addEventListener("click", async () => {
+// toioに接続する
+async function connectToCube() {
   try {
-    console.log("接続開始...");
-
-    const device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [
-        '0000fd6f-0000-1000-8000-00805f9b34fb', // toio制御サービス
-        '0000180f-0000-1000-8000-00805f9b34fb', // Battery
-        '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
-        '00001801-0000-1000-8000-00805f9b34fb'  // Generic Attribute
-      ]
-    });
-
-    const server = await device.gatt.connect();
-
-    // 念のため少し待つ
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const services = await server.getPrimaryServices();
-
-    if (services.length === 0) {
-      throw new Error("サービスが取得できませんでした");
-    }
-
-    console.log("取得したサービス一覧:");
-    for (const service of services) {
-      console.log(`Service UUID: ${service.uuid}`);
-    }
-
-    alert("接続成功！toio制御サービスが表示されているか確認してください");
-
-  } catch (error) {
-    console.error("接続エラー:", error);
-    alert("接続失敗: " + error.message);
+    cube = await P5tCube.connectNewP5tCube();
+    cube.turnLightOn("blue");
+    cube.playMelody([{note: 0x3C, duration: 30}]);
+    alert("toioに接続できました！");
+    console.log("接続成功:", cube);
+  } catch (e) {
+    alert("接続に失敗しました: " + e);
+    console.error("接続エラー:", e);
   }
-});
+}
+
+// 正解時：前進＋緑ライト＋音
+function quizCorrect() {
+  if (!cube) {
+    alert("toioが接続されていません！");
+    return;
+  }
+  cube.turnLightOn("green");
+  cube.playMelody([
+    {note: 0x3C, duration: 30},
+    {note: 0x3E, duration: 30},
+    {note: 0x40, duration: 30}
+  ]);
+  cube.move(100, 0, 300); // 前進
+}
+
+// 不正解時：後退＋赤ライト＋低音
+function quizWrong() {
+  if (!cube) {
+    alert("toioが接続されていません！");
+    return;
+  }
+  cube.turnLightOn("red");
+  cube.playMelody([
+    {note: 0x30, duration: 30},
+    {note: 0x2E, duration: 30}
+  ]);
+  cube.move(-50, 0, 300); // 後退
+}

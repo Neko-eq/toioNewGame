@@ -2,21 +2,34 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>p5.toio 接続テスト</title>
+  <title>toio クイズゲーム</title>
+
+  <!-- p5.js & p5.toio 読み込み -->
   <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
   <script src="https://tetunori.github.io/p5.toio/dist/0.8.0/p5.toio.min.js"></script>
+
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 30px;
+    }
+    button {
+      font-size: 20px;
+      margin: 10px;
+      padding: 10px 20px;
+    }
+  </style>
 </head>
 <body>
-  <h1>toio接続テスト</h1>
-  <button onclick="connectToCube()">toioに接続</button>
+  <h1>toio クイズゲーム</h1>
+  <p>toioと接続して、「正解」「不正解」で動作を確認しましょう！</p>
 
-  <script>
-    async function connectToCube() {
-      const cube = await P5tCube.connectNewP5tCube();
-      cube.turnLightOn("blue"); // 青く光らせる
-      cube.playMelody([{note: 0x3C, duration: 30}]); // ドの音
-      console.log("接続成功:", cube);
-    }
-  </script>
+  <button onclick="connectToCube()">🔗 toioに接続</button><br><br>
+  <button onclick="quizCorrect()">✅ 正解！</button>
+  <button onclick="quizWrong()">❌ 不正解</button>
+
+  <!-- JavaScript本体を読み込む -->
+  <script type="text/javascript" src="main.js"></script>
 </body>
 </html>
