@@ -4,7 +4,7 @@ let cube; // 接続されたtoioを保持
 async function connectToCube() {
   try {
     cube = await P5tCube.connectNewP5tCube();
-    cube.turnLightOn("blue");
+    cube.turnLightOn({r: 0, g: 0, b: 255}); // 青
     cube.playMelody([{note: 0x3C, duration: 30}]);
     alert("toioに接続できました！");
     console.log("接続成功:", cube);
@@ -20,7 +20,7 @@ function quizCorrect() {
     alert("toioが接続されていません！");
     return;
   }
-  cube.turnLightOn("green");
+  cube.turnLightOn({r: 0, g: 255, b: 0}); // 緑
   cube.playMelody([
     {note: 0x3C, duration: 30},
     {note: 0x3E, duration: 30},
@@ -35,7 +35,7 @@ function quizWrong() {
     alert("toioが接続されていません！");
     return;
   }
-  cube.turnLightOn("red");
+  cube.turnLightOn({r: 255, g: 0, b: 0}); // 赤
   cube.playMelody([
     {note: 0x30, duration: 30},
     {note: 0x2E, duration: 30}
