@@ -58,35 +58,20 @@ let isProcessingSelection = false; // 選択処理中フラグ
 // 傾き判定の閾値
 const TILT_THRESHOLD = 20; // デグリー単位。この値を超えて傾いたと判断する閾値。
 
-// --- p5.js と p5.toio の設定 ---
-
-// グローバル変数として、Toioが接続されたかどうかのフラグと、現在の傾きデータを保持
-let g_isToioConnected = false;
-// g_currentRoll, g_currentPitch は draw 関数内で直接 p5tCube.roll/pitch を参照するため不要になりました
+// --- p5.js の設定 ---
 
 // p5.js のセットアップ関数 (初回一度だけ実行される)
 function setup() {
+    // p5.js の描画キャンバスを生成しますが、今回は表示用ではないので最小サイズに設定し、非表示にします。
+    // HTMLキャンバスが<body>の子要素として作成されるようにします。
     createCanvas(1, 1).parent(document.body);
-    noCanvas();
-    // ここではToio接続は行わない。ボタンクリック時に接続する
+    noCanvas(); // キャンバスは非表示に
 }
 
-// p5.js のドロー関数 (毎フレーム実行される)
-// ここでToioのセンサーデータをポーリングします
+// p5.js のドロー関数 (毎フレーム実行されるが、今回は直接センサーポーリングには使わない)
 function draw() {
-    if (g_isToioConnected && p5tCube && p5tCube.isConnected()) {
-        // p5tCube の sensor オブジェクトから直接 roll と pitch を取得
-        // p5.toio v0.8.0 では、P5tCubeインスタンスのプロパティとして直接アクセスできるようです
-        const roll = p5tCube.roll;
-        const pitch = p5tCube.pitch;
-
-        // デバッグ表示の更新
-        debugRoll.innerText = roll !== undefined && roll !== null ? roll.toFixed(2) : "N/A";
-        debugPitch.innerText = pitch !== undefined && pitch !== null ? pitch.toFixed(2) : "N/A";
-
-        // 傾き判定ロジックを呼び出す
-        handleToioTilt(roll, pitch);
-    }
+    // 描画処理や、直接的なセンサーポーリングは行わない。
+    // センサーデータはイベントリスナーで取得します。
 }
 
 // Toio接続ボタンのイベントリスナー
@@ -98,8 +83,8 @@ connectButton.addEventListener('click', async () => {
         statusText.innerText = 'Toioに接続しました！';
         connectButton.style.display = 'none'; // 接続ボタンを非表示に
 
-        // 接続成功したら、p5.js の draw ループ内でセンサーデータを監視するフラグを立てる
-        g_isToioConnected = true; // このフラグを立てることで draw 関数内でセンサー監視が開始されます
+        // Toioのモーションセンサーイベントの購読を開始
+        startToioMotionSensor();
 
         // 最初のクイズを表示
         displayQuestion(currentQuestionIndex);
@@ -110,9 +95,36 @@ connectButton.addEventListener('click', async () => {
     }
 });
 
+// Toioのモーションセンサーデータ購読を開始する関数
+function startToioMotionSensor() {
+    if (p5tCube) {
+        // p5.toio では 'sensor:motion' イベントでモーションデータを取得
+        p5tCube.on("sensor:motion", (data) => {
+            // ここで、受け取った 'data' オブジェクトの中身をコンソールで確認することが非常に重要です！
+            // data.roll と data.pitch が存在しない場合、以下の行を修正する必要があります。
+            console.log("Motion Data:", data); // ★この行のコンソールログでデータ構造を確認してください★
+
+            // 仮に data.roll と data.pitch が直接存在すると仮定します。
+            // もし data.attitude.roll など、異なるパスにある場合はここを修正してください。
+            const roll = data.roll;
+            const pitch = data.pitch;
+
+            // デバッグ表示の更新
+            debugRoll.innerText = roll !== undefined && roll !== null ? roll.toFixed(2) : "N/A";
+            debugPitch.innerText = pitch !== undefined && pitch !== null ? pitch.toFixed(2) : "N/A";
+
+            // 傾き判定ロジックを呼び出す
+            handleToioTilt(roll, pitch);
+        });
+        // p5.toio は通常、接続時に自動でセンサーデータを送る設定になっていることが多いですが、
+        // もし必要なら明示的なセンサーONのAPIがあればここに記述。
+        // 現時点では、p5.toio v0.8.0の一般的な使用法では不要のはずです。
+    }
+}
+
 // 傾き判定ロジック
 function handleToioTilt(roll, pitch) {
-    // roll または pitch が undefined/null の場合は処理しない（初期データがまだ来ていない可能性）
+    // roll または pitch が undefined/null の場合は処理しない（データがまだ来ていない可能性）
     if (roll === undefined || roll === null || pitch === undefined || pitch === null) {
         return;
     }
@@ -122,19 +134,14 @@ function handleToioTilt(roll, pitch) {
     let currentDetectedDirection = null;
 
     // Toioの姿勢角の取り方によって、正負の判定が変わる可能性があります。
-    // 手前に傾けるとpitchが正、奥に傾けると負。
-    // 右に傾けるとrollが正、左に傾けると負。
-    // 以下は一般的な想定での閾値判定です。実機で確認しながら調整してください。
-
-    // 斜め方向の判定（4方向の選択肢に対応）
-    // 例えば、左上は「奥に傾けつつ左に傾ける」
-    // Toioのロゴを上にして水平に置いた状態を基準（roll, pitchが0付近）とします。
+    // Toioのロゴが上を向いて水平に置かれた状態を基準（roll, pitchが0付近）とします。
+    // 一般的な想定:
     // 奥に傾ける = pitch が正の値に（Toioを自分から遠ざけるように傾ける）
     // 手前に傾ける = pitch が負の値に（Toioを自分に近づけるように傾ける）
     // 右に傾ける = roll が正の値に
     // 左に傾ける = roll が負の値に
 
-    // どの方向に傾いているかを判定
+    // どの方向に傾いているかを判定 (斜め4方向)
     if (pitch > TILT_THRESHOLD && roll < -TILT_THRESHOLD) { // 奥（上）に傾けつつ、左に傾ける
         currentDetectedDirection = "topLeft";
     } else if (pitch > TILT_THRESHOLD && roll > TILT_THRESHOLD) { // 奥（上）に傾けつつ、右に傾ける
