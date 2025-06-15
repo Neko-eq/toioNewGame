@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>p5.toio 接続テスト</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.6.0/lib/p5.min.js"></script>
+  <script src="https://tetunori.github.io/p5.toio/dist/0.8.0/p5.toio.min.js"></script>
+</head>
+<body>
+  <h1>toio接続テスト</h1>
+  <button onclick="connectToCube()">toioに接続</button>
+
+  <script>
+    async function connectToCube() {
+      const cube = await P5tCube.connectNewP5tCube();
+      cube.turnLightOn("blue"); // 青く光らせる
+      cube.playMelody([{note: 0x3C, duration: 30}]); // ドの音
+      console.log("接続成功:", cube);
+    }
+  </script>
+</body>
+</html>
